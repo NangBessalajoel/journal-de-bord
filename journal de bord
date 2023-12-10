@@ -1,0 +1,130 @@
+import tkinter as tk
+from tkinter import ttk, simpledialog, messagebox
+import json
+from datetime import datetime
+
+class EventManager:
+    def __init__(self):
+        self.events = []
+        self.load_events()
+
+    def load_events(self):
+        try:
+            with open('events.json', 'r') as file:
+                self.events = json.load(file)
+        except FileNotFoundError:
+            pass
+
+    def save_events(self):
+        with open('events.json', 'w') as file:
+            json.dump(self.events, file)
+
+    def add_event(self, event):
+        self.events.append(event)
+        self.save_events()
+
+    def edit_event(self, index, event):
+        self.events[index] = event
+        self.save_events()
+
+    def delete_event(self, index):
+        del self.events[index]
+        self.save_events()
+
+    def check_reminders(self):
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for event in self.events:
+            event_date = f"{event['Date']} {event['Time']}"
+            if current_date == event_date:
+                print(f"Reminder: {event['Name']} is today!")
+
+class EventApplication:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("JOURNAL DE BORD")
+
+        self.event_manager = EventManager()
+
+        # Create UI elements
+        self.create_widgets()
+
+        # Check for reminders every minute
+        self.root.after(60000, self.check_reminders)
+
+    def create_widgets(self):
+        # Event list
+        self.event_tree = ttk.Treeview(self.root, columns=("Name", "Date", "Time", "Type"))
+        self.event_tree.heading("#0", text="ID")
+        self.event_tree.heading("Name", text="Name")
+        self.event_tree.heading("Date", text="Date")
+        self.event_tree.heading("Time", text="Time")
+        self.event_tree.heading("Type", text="Type")
+
+        self.event_tree.pack(pady=10)
+
+        # Buttons
+        add_button = tk.Button(self.root, text="Ajouter un evenement", command=self.show_add_event_window)
+        add_button.pack(side=tk.LEFT, padx=10)
+
+        edit_button = tk.Button(self.root, text="Modifier un evenement", command=self.show_edit_event_window)
+        edit_button.pack(side=tk.LEFT, padx=10)
+
+        delete_button = tk.Button(self.root, text="supprimer un evenement", command=self.delete_event)
+        delete_button.pack(side=tk.LEFT, padx=10)
+
+        # Load events into the tree
+        self.load_events_into_tree()
+
+    def load_events_into_tree(self):
+        for i, event in enumerate(self.event_manager.events):
+            self.event_tree.insert("", "end", values=(i, event["Name"], event["Date"], event["Time"], event["Type"]))
+
+    def show_add_event_window(self):
+        name = simpledialog.askstring("Add Event", "Enter event name:")
+        if name:
+            date = simpledialog.askstring("Add Event", "Enter event date (YYYY-MM-DD):")
+            time = simpledialog.askstring("Add Event", "Enter event time:")
+            event_type = simpledialog.askstring("Add Event", "Enter event type:")
+            new_event = {"Name": name, "Date": date, "Time": time, "Type": event_type}
+            self.event_manager.add_event(new_event)
+            self.load_events_into_tree()
+
+    def show_edit_event_window(self):
+        selected_item = self.event_tree.selection()
+        if selected_item:
+            index = int(self.event_tree.item(selected_item, "values")[0])
+            current_event = self.event_manager.events[index]
+
+            name = simpledialog.askstring("Edit Event", "Enter event name:", initialvalue=current_event["Name"])
+            if name:
+                date = simpledialog.askstring("Edit Event", "Enter event date (YYYY-MM-DD):", initialvalue=current_event["Date"])
+                time = simpledialog.askstring("Edit Event", "Enter event time:", initialvalue=current_event["Time"])
+                event_type = simpledialog.askstring("Edit Event", "Enter event type:", initialvalue=current_event["Type"])
+
+                updated_event = {"Name": name, "Date": date, "Time": time, "Type": event_type}
+                self.event_manager.edit_event(index, updated_event)
+                self.load_events_into_tree()
+
+    def delete_event(self):
+        selected_item = self.event_tree.selection()
+        if selected_item:
+            index = int(self.event_tree.item(selected_item, "values")[0])
+            event_name = self.event_manager.events[index]["Name"]
+
+            # Demander une confirmation avant de supprimer l'événement
+            confirmation = messagebox.askyesno("Confirmation", f"Êtes-vous sûr de vouloir supprimer l'événement '{event_name}'?")
+            if confirmation:
+                self.event_manager.delete_event(index)
+                self.load_events_into_tree()
+
+    def check_reminders(self):
+        self.event_manager.check_reminders()
+        # Check for reminders again every minute
+        self.root.after(60000, self.check_reminders)
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.configure(bg='cyan4')
+    app = EventApplication(root)
+    root.mainloop()
